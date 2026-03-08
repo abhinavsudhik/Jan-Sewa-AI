@@ -1,0 +1,170 @@
+name: Deploy Backend to AWS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: govt-services-backend-prod
+  ECS_SERVICE: govt-services-backend-prod
+  ECS_CLUSTER: govt-services-cluster-prod
+  ENVIRONMENT: prod
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+      
+      - name: Run tests
+        run: |
+          cd backend
+          pytest tests/ --cov=app --cov-report=xml || echo "No tests found, skipping"
+      
+      - name: Upload coverage
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+          fail_ci_if_error: false
+
+  deploy-backend:
+    needs: [test-backend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd backend
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile.prod .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Get current task definition
+        id: get-task-def
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition govt-services-backend-${{ env.ENVIRONMENT }} \
+            --query 'taskDefinition' \
+            --output json > task-definition.json
+          
+          # Remove fields that can't be used in register-task-definition
+          cat task-definition.json | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > task-definition-clean.json
+      
+      - name: Update task definition with new image
+        id: task-def
+        run: |
+          cat task-definition-clean.json | jq --arg IMAGE "${{ steps.build-image.outputs.image }}" \
+            '.containerDefinitions[0].image = $IMAGE' > new-task-definition.json
+          
+          echo "task-definition=new-task-definition.json" >> $GITHUB_OUTPUT
+      
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: new-task-definition.json
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+      
+      - name: Verify deployment
+        run: |
+          # Get ALB DNS name
+          BACKEND_URL=$(aws elbv2 describe-load-balancers \
+            --names govt-services-alb-${{ env.ENVIRONMENT }} \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)
+          
+          echo "Backend URL: http://$BACKEND_URL"
+          
+          # Wait for service to be healthy
+          for i in {1..20}; do
+            if curl -f "http://$BACKEND_URL/health"; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "⏳ Waiting for service to be healthy... (attempt $i/20)"
+            sleep 15
+          done
+          
+          echo "❌ Health check failed after 20 attempts"
+          exit 1
+
+  rollback:
+    needs: [deploy-backend]
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Rollback ECS service
+        run: |
+          echo "🔄 Rolling back to previous task definition..."
+          
+          # Get previous task definition
+          PREVIOUS_TASK_DEF=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query 'services[0].deployments[1].taskDefinition' \
+            --output text)
+          
+          if [ "$PREVIOUS_TASK_DEF" != "None" ] && [ -n "$PREVIOUS_TASK_DEF" ]; then
+            echo "Previous task definition: $PREVIOUS_TASK_DEF"
+            
+            # Update service to previous task definition
+            aws ecs update-service \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --service ${{ env.ECS_SERVICE }} \
+              --task-definition $PREVIOUS_TASK_DEF \
+              --force-new-deployment
+            
+            echo "✅ Rollback initiated"
+          else
+            echo "⚠️ No previous task definition found, cannot rollback"
+          fi

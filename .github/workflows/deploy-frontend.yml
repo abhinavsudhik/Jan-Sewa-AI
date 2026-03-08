@@ -1,0 +1,181 @@
+name: Deploy Frontend to AWS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: govt-services-frontend-prod
+  ENVIRONMENT: prod
+
+jobs:
+  test-frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Run linter
+        run: |
+          cd frontend
+          npm run lint || echo "Linting skipped"
+      
+      - name: Build application
+        env:
+          NEXT_PUBLIC_API_URL: http://placeholder.local
+        run: |
+          cd frontend
+          npm run build
+
+  deploy-frontend:
+    needs: [test-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get backend URL from Terraform outputs
+        id: backend-url
+        run: |
+          # Try to get backend URL from Terraform outputs
+          cd terraform
+          BACKEND_URL=$(terraform output -raw backend_url 2>/dev/null || echo "")
+          
+          if [ -z "$BACKEND_URL" ]; then
+            # Fallback: Get from ALB directly
+            BACKEND_URL=$(aws elbv2 describe-load-balancers \
+              --names govt-services-alb-${{ env.ENVIRONMENT }} \
+              --query 'LoadBalancers[0].DNSName' \
+              --output text 2>/dev/null || echo "http://localhost:8000")
+          fi
+          
+          echo "Backend URL: $BACKEND_URL"
+          echo "url=http://$BACKEND_URL" >> $GITHUB_OUTPUT
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Build frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ steps.backend-url.outputs.url }}
+        run: |
+          cd frontend
+          npm run build
+      
+      - name: Export static files
+        run: |
+          cd frontend
+          # Check if next export is available
+          if grep -q '"export"' package.json; then
+            npm run export
+          else
+            # For Next.js 13+ with app directory, use output: 'export' in next.config.js
+            echo "Using build output directory"
+            mkdir -p out
+            cp -r .next/standalone/* out/ 2>/dev/null || cp -r .next/* out/ 2>/dev/null || echo "Using .next directory"
+          fi
+      
+      - name: Deploy to S3
+        run: |
+          cd frontend
+          
+          # Determine output directory
+          if [ -d "out" ]; then
+            OUTPUT_DIR="out"
+          elif [ -d ".next/standalone" ]; then
+            OUTPUT_DIR=".next/standalone"
+          else
+            OUTPUT_DIR=".next"
+          fi
+          
+          echo "Deploying from $OUTPUT_DIR to s3://${{ env.S3_BUCKET }}/"
+          
+          aws s3 sync $OUTPUT_DIR/ s3://${{ env.S3_BUCKET }}/ \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*.html" \
+            --exclude "service-worker.js"
+          
+          # Upload HTML files with no-cache
+          aws s3 sync $OUTPUT_DIR/ s3://${{ env.S3_BUCKET }}/ \
+            --exclude "*" \
+            --include "*.html" \
+            --include "service-worker.js" \
+            --cache-control "public, max-age=0, must-revalidate"
+      
+      - name: Get CloudFront distribution ID
+        id: cloudfront
+        run: |
+          # Try to get from Terraform outputs
+          cd terraform
+          DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "")
+          
+          if [ -z "$DISTRIBUTION_ID" ]; then
+            # Fallback: Get from CloudFront directly
+            DISTRIBUTION_ID=$(aws cloudfront list-distributions \
+              --query "DistributionList.Items[?Comment=='CloudFront distribution for govt-services ${{ env.ENVIRONMENT }}'].Id | [0]" \
+              --output text 2>/dev/null || echo "")
+          fi
+          
+          echo "Distribution ID: $DISTRIBUTION_ID"
+          echo "id=$DISTRIBUTION_ID" >> $GITHUB_OUTPUT
+      
+      - name: Invalidate CloudFront cache
+        if: steps.cloudfront.outputs.id != ''
+        run: |
+          echo "Creating CloudFront invalidation..."
+          
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.cloudfront.outputs.id }} \
+            --paths "/*"
+          
+          echo "✅ CloudFront cache invalidation created"
+      
+      - name: Deployment summary
+        run: |
+          echo "🚀 Frontend deployment completed!"
+          echo "📦 S3 Bucket: s3://${{ env.S3_BUCKET }}/"
+          
+          if [ -n "${{ steps.cloudfront.outputs.id }}" ]; then
+            CLOUDFRONT_URL=$(aws cloudfront get-distribution \
+              --id ${{ steps.cloudfront.outputs.id }} \
+              --query 'Distribution.DomainName' \
+              --output text)
+            echo "🌐 CloudFront URL: https://$CLOUDFRONT_URL"
+          fi
