@@ -1,0 +1,4 @@
+# file: /Users/abhinavsudhi/Desktop/Jan-Sewa-AI/backend/app/core/config.py
+# hypothesis_version: 6.151.9
+
+['.env', 'dev_secret_key', 'development', 'redis://redis:6379', 'your_key_here']

@@ -1,0 +1,4 @@
+# file: /Users/abhinavsudhi/Desktop/Jan-Sewa-AI/backend/app/main.py
+# hypothesis_version: 6.151.9
+
+['*', '/', '/api/v1/chat', '/api/v1/dashboard', '/api/v1/documents', '/api/v1/services', '/docs', '/health', '1.0.0', 'chat', 'dashboard', 'docs', 'documents', 'healthy', 'message', 'services', 'status', 'version']

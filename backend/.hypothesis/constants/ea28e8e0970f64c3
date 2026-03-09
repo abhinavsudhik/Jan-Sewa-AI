@@ -1,0 +1,4 @@
+# file: /Users/abhinavsudhi/Desktop/Jan-Sewa-AI/backend/app/api/v1/services.py
+# hypothesis_version: 6.151.9
+
+[404, '/', '/{service_id}', '10 minutes', '15 minutes', '1947', '30 days', '5 minutes', '7 days', '90 days', 'Aadhaar Name Change', 'Biometric update', 'Service not found', 'aadhaar_name_change', 'en', 'help@uidai.gov.in', 'hi', 'https://uidai.gov.in', 'ta', 'te']
