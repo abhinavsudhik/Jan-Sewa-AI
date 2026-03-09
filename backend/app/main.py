@@ -35,3 +35,12 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/cors-debug")
+async def cors_debug():
+    """Debug endpoint to check CORS configuration"""
+    return {
+        "allowed_origins": settings.get_cors_origins(),
+        "vercel_url": settings.VERCEL_URL,
+        "additional_origins": settings.ADDITIONAL_CORS_ORIGINS
+    }

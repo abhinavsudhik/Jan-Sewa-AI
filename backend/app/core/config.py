@@ -4,10 +4,19 @@ import os
 import json
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://govt_services_user:secure_password_here@postgres:5432/govt_services"
-    REDIS_URL: str = "redis://redis:6379"
+    # Database - optional for basic functionality
+    DATABASE_URL: Optional[str] = None
+    
+    # Redis - optional
+    REDIS_URL: Optional[str] = None
+    
+    # API Keys - required for AI features
     GEMINI_API_KEY: str = "your_key_here"
-    SECRET_KEY: str = "dev_secret_key"
+    
+    # Security
+    SECRET_KEY: str = "dev_secret_key_change_in_production"
+    
+    # Environment
     ENVIRONMENT: str = "development"
     
     # Vercel deployment URL (configurable via environment variable)
