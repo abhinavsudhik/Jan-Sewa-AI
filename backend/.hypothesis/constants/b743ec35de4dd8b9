@@ -1,0 +1,4 @@
+# file: /Users/abhinavsudhi/Desktop/Jan-Sewa-AI/backend/app/main.py
+# hypothesis_version: 6.151.9
+
+['*', '/', '/api/v1/chat', '/api/v1/dashboard', '/api/v1/documents', '/api/v1/services', '/cors-debug', '/docs', '/health', '1.0.0', 'additional_origins', 'allowed_origins', 'chat', 'dashboard', 'docs', 'documents', 'healthy', 'message', 'services', 'status', 'vercel_url', 'version']
