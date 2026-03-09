@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 import os
+import json
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://govt_services_user:secure_password_here@postgres:5432/govt_services"
@@ -10,23 +11,40 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     
     # Vercel deployment URL (configurable via environment variable)
-    VERCEL_URL: str = "https://jansewaai-beige.vercel.app"
+    VERCEL_URL: Optional[str] = None
     
-    # Allow Vercel and local development
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ]
+    # Additional CORS origins (optional, comma-separated)
+    ADDITIONAL_CORS_ORIGINS: Optional[str] = None
     
     class Config:
         env_file = ".env"
         case_sensitive = True
     
     def get_cors_origins(self) -> List[str]:
-        """Get the complete list of allowed CORS origins including Vercel URL"""
-        origins = self.CORS_ORIGINS.copy()
+        """Get the complete list of allowed CORS origins"""
+        origins = [
+            "http://localhost:3000",
+            "http://localhost:3001",
+        ]
+        
+        # Add Vercel URL if set
         if self.VERCEL_URL:
             origins.append(self.VERCEL_URL)
-        return origins
+        
+        # Add additional origins from env var if set
+        if self.ADDITIONAL_CORS_ORIGINS:
+            # Treat as comma-separated string
+            additional = [o.strip() for o in self.ADDITIONAL_CORS_ORIGINS.split(",") if o.strip()]
+            origins.extend(additional)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_origins = []
+        for origin in origins:
+            if origin not in seen:
+                seen.add(origin)
+                unique_origins.append(origin)
+        
+        return unique_origins
 
 settings = Settings()
