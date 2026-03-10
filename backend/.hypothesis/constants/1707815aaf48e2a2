@@ -1,0 +1,4 @@
+# file: /Users/abhinavsudhi/Desktop/Jan-Sewa-AI/backend/app/services/schema_adapter.py
+# hypothesis_version: 6.151.9
+
+[365, '(\\d+)', ',', '000000', 'Main Office', 'Official Portal', 'Service Office', 'Unknown', '\\b(\\d{6})\\b', 'day', 'days', 'legacy_migration', 'month', 'portal', 'standard', 'week', 'year']

@@ -34,9 +34,12 @@ export interface ServiceGuide {
   available_languages: string[];
 }
 
+import { EnhancedServiceGuide } from '../src/types/service';
+
 export interface ChatResponse {
   message: string;
   language: string;
   session_id: string;
   service_guide?: ServiceGuide;
+  enhanced_service_guide?: EnhancedServiceGuide; // Enhanced service data with raw structure
 }

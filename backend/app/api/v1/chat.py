@@ -59,12 +59,23 @@ async def process_chat(message: ChatMessage):
             # Also provide legacy format for backward compatibility
             legacy_service = SchemaAdapter.enhanced_to_legacy(query_result.service)
             
+            # Create enhanced service guide with sections for frontend
+            enhanced_guide_dict = query_result.service.model_dump()
+            enhanced_guide_dict["sections"] = [
+                {
+                    "header": section.header,
+                    "content": section.content,
+                    "is_empty": section.is_empty
+                }
+                for section in formatted_response.sections
+            ]
+            
             return ChatResponse(
                 message=f"I can help you with {query_result.service.service_name}. Here's the complete guide:",
                 language=message.language,
                 session_id=session_id,
                 service_guide=legacy_service,
-                enhanced_service_guide=enhanced_response
+                enhanced_service_guide=enhanced_guide_dict
             )
             
         elif query_result.status == "no_match":

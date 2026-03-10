@@ -1,7 +1,7 @@
 from pydantic import BaseModel, HttpUrl
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 class ServiceCategory(str, Enum):
     AADHAAR = "aadhaar"
@@ -67,7 +67,7 @@ class ChatResponse(BaseModel):
     language: str
     session_id: str
     service_guide: Optional[ServiceGuide] = None
-    enhanced_service_guide: Optional[EnhancedServiceResponse] = None
+    enhanced_service_guide: Optional[Dict[str, Any]] = None  # Use Dict to avoid circular import
 
 class ErrorResponse(BaseModel):
     """Error response for chat queries."""

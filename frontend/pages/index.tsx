@@ -1,15 +1,20 @@
 import { useState } from 'react'
 import axios from 'axios'
 import styles from '../styles/Home.module.css'
-import { ServiceGuide } from '../types/chat'
+import { ServiceGuide, ChatResponse } from '../types/chat'
+import { EnhancedServiceGuide } from '../src/types/service'
 import ServiceGuideDisplay from '../components/ServiceGuideDisplay'
+import { EnhancedServiceGuideDisplay } from '../src/components/EnhancedServiceGuideDisplay'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
   serviceGuide?: ServiceGuide
+  enhancedServiceGuide?: EnhancedServiceGuide
+  errorType?: string
+  suggestions?: string[]
 }
 
 export default function Home() {
@@ -31,19 +36,39 @@ export default function Home() {
         language: 'en'
       })
 
+      const data: ChatResponse = response.data
+
       const assistantMessage: Message = {
         role: 'assistant',
-        content: response.data.message,
-        serviceGuide: response.data.service_guide
+        content: data.message,
+        serviceGuide: data.service_guide,
+        enhancedServiceGuide: data.enhanced_service_guide
       }
       setMessages(prev => [...prev, assistantMessage])
     } catch (error) {
       console.error('Error sending message:', error)
-      const errorMessage: Message = {
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.'
+      
+      // Handle different types of errors
+      let errorMessage = 'Sorry, I encountered an error. Please try again.'
+      let errorType = 'system_error'
+      let suggestions: string[] = []
+
+      if (axios.isAxiosError(error) && error.response?.data) {
+        const errorData = error.response.data
+        if (errorData.error_type) {
+          errorType = errorData.error_type
+          errorMessage = errorData.message || errorMessage
+          suggestions = errorData.suggestions || []
+        }
       }
-      setMessages(prev => [...prev, errorMessage])
+
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: errorMessage,
+        errorType,
+        suggestions
+      }
+      setMessages(prev => [...prev, assistantMessage])
     } finally {
       setLoading(false)
     }
@@ -80,8 +105,21 @@ export default function Home() {
                 }`}
               >
                 <div className={styles.messageContent}>{msg.content}</div>
-                {msg.serviceGuide && (
+                {msg.enhancedServiceGuide && (
+                  <EnhancedServiceGuideDisplay guide={msg.enhancedServiceGuide} />
+                )}
+                {msg.serviceGuide && !msg.enhancedServiceGuide && (
                   <ServiceGuideDisplay guide={msg.serviceGuide} />
+                )}
+                {msg.suggestions && msg.suggestions.length > 0 && (
+                  <div className={styles.suggestions}>
+                    <h4>Suggestions:</h4>
+                    <ul>
+                      {msg.suggestions.map((suggestion, idx) => (
+                        <li key={idx}>{suggestion}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             ))}
