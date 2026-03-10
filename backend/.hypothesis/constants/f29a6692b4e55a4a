@@ -1,0 +1,4 @@
+# file: /Users/abhinavsudhi/Desktop/Jan-Sewa-AI/backend/app/data/enhanced_mock_services.py
+# hypothesis_version: 6.151.9
+
+[28.5672, 28.6315, 28.6507, 28.7041, 77.1025, 77.21, 77.2167, 77.2334, 2024, '+91-11-23417777', '+91-11-23466868', '+91-11-23941234', '+91-11-27555444', '110001', '110006', '110023', '110085', '15 minutes', '30 minutes', '45-60 minutes', 'Aadhaar Card', 'Aadhaar Name Change', 'Aadhaar Seva Kendra', 'Address Proof', 'Appointment Booking', 'Bank Statement', 'Delhi', 'Driving License', 'Electricity Bill', 'Identity Proof', 'New Delhi', 'Original document', 'PAN Card', 'Passport', 'RTI Online Portal', 'Ration Card', 'Sector 7, Rohini', 'Status Tracking', 'Telephone Bill', 'Voter ID', 'aadhaar_name_change', 'birth_certificate', 'data_access_request', 'days', 'en', 'expedited', 'hi', 'standard']

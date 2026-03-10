@@ -1,0 +1,4 @@
+# file: /Users/abhinavsudhi/Desktop/Jan-Sewa-AI/backend/app/services/response_formatter.py
+# hypothesis_version: 6.151.9
+
+['   (Optional)', '  (Optional)', 'office_locations', 'official_websites', 'processing_timelines', 'required_documents', '📄 Required Documents', '📍 Office Locations', '🔗 Official Websites']

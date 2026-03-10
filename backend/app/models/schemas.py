@@ -43,6 +43,20 @@ class ServiceGuide(BaseModel):
     last_updated: datetime
     available_languages: List[str]
 
+# Enhanced response models for structured service information
+class ResponseSection(BaseModel):
+    """A section in the formatted service response."""
+    header: str
+    content: str
+    is_empty: bool
+
+class EnhancedServiceResponse(BaseModel):
+    """Enhanced service response with structured format."""
+    service_name: str
+    description: str
+    sections: List[ResponseSection]
+    last_updated: datetime
+
 class ChatMessage(BaseModel):
     message: str
     language: str = "en"
@@ -53,6 +67,14 @@ class ChatResponse(BaseModel):
     language: str
     session_id: str
     service_guide: Optional[ServiceGuide] = None
+    enhanced_service_guide: Optional[EnhancedServiceResponse] = None
+
+class ErrorResponse(BaseModel):
+    """Error response for chat queries."""
+    error_type: str  # no_match, ambiguous, system_error
+    message: str
+    suggestions: Optional[List[str]] = None
+    matches: Optional[List[str]] = None
 
 class DocumentUpload(BaseModel):
     document_type: str

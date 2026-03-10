@@ -1,0 +1,4 @@
+# file: /Users/abhinavsudhi/Desktop/Jan-Sewa-AI/backend/app/services/query_processor.py
+# hypothesis_version: 6.151.9
+
+['aadhaar', 'aadhaar_name_change', 'access', 'ambiguous', 'birth', 'birth_certificate', 'certificate', 'data', 'data_access_request', 'driving', 'driving_license', 'license', 'name', 'no_match', 'service', 'status', 'success', 'tracking']
